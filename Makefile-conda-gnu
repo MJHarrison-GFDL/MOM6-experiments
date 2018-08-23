@@ -2,12 +2,12 @@ SHELL = bash
 PLATFORM = linux
 COMPILER = gnu
 RESULTS = results/$(PLATFORM)/$(COMPILER)/repro
-RUN_CMD = aprun
+RUN_CMD = mpirun
 
 all: test_solo test_cpld test_restart
 
 env:
-	if [ ! -d $(REULTS) ]; then mkdir -p $(RESULTS);fi
+	if [ ! -d $(RESULTS) ]; then mkdir -p $(RESULTS);fi
 
 compile_libs: env build/shared.$(PLATFORM).$(COMPILER).debug/libfms.a  build/shared.$(PLATFORM).$(COMPILER).repro/libfms.a build/MOM6.$(PLATFORM).$(COMPILER).debug/libMOM6.a build/MOM6.$(PLATFORM).$(COMPILER).repro/libMOM6.a build/MOM6_asym.$(PLATFORM).$(COMPILER).debug/libMOM6.a build/MOM6_asym.$(PLATFORM).$(COMPILER).repro/libMOM6.a
 
@@ -29,7 +29,7 @@ build/shared.$(PLATFORM).$(COMPILER).repro/libfms.a:
         -o '-I$(CONDA_PREFIX)/include' -c "-Duse_libMPI -Duse_netCDF -DSPMD -DLAND_BND_TRACERS" path_names; \
 	source ../../build/env/$(PLATFORM)-$(COMPILER); make  NETCDF=3 REPRO=1 libfms.a)
 
-build/MOM6.$(PLATFORM).$(COMPILER).debug/libMOM6.a: compile_libs
+build/MOM6.$(PLATFORM).$(COMPILER).debug/libMOM6.a: build/shared.$(PLATFORM).$(COMPILER).debug/libfms.a
 
 	mkdir -p build/MOM6.$(PLATFORM).$(COMPILER).debug
 	(cd build/MOM6.$(PLATFORM).$(COMPILER).debug/; rm -f path_names; ../../src/mkmf/bin/list_paths \
@@ -44,7 +44,7 @@ build/MOM6.$(PLATFORM).$(COMPILER).debug/libMOM6.a: compile_libs
 	source ../../build/env/$(PLATFORM)-$(COMPILER); make  NETCDF=3 DEBUG=1 -j 8 libMOM6.a;\
 	if [ -f ../../build/MOM6_solo.$(PLATFORM).$(COMPILER).debug/MOM6 ]; then rm ../../build/MOM6_solo.$(PLATFORM).$(COMPILER).debug/MOM6; fi)
 
-build/MOM6.$(PLATFORM).$(COMPILER).repro/libMOM6.a: compile_libs
+build/MOM6.$(PLATFORM).$(COMPILER).repro/libMOM6.a: build/shared.$(PLATFORM).$(COMPILER).repro/libfms.a
 
 	mkdir -p build/MOM6.$(PLATFORM).$(COMPILER).repro
 	(cd build/MOM6.$(PLATFORM).$(COMPILER).repro/; rm -f path_names; ../../src/mkmf/bin/list_paths \
@@ -59,7 +59,7 @@ build/MOM6.$(PLATFORM).$(COMPILER).repro/libMOM6.a: compile_libs
 	source ../../build/env/$(PLATFORM)-$(COMPILER); make  NETCDF=3 REPRO=1 -j 8 libMOM6.a;\
 	if [ -f ../../build/MOM6_solo.$(PLATFORM).$(COMPILER).repro/MOM6 ]; then rm ../../build/MOM6_solo.$(PLATFORM).$(COMPILER).repro/MOM6; fi)
 
-build/MOM6_asym.$(PLATFORM).$(COMPILER).debug/libMOM6.a: compile_libs
+build/MOM6_asym.$(PLATFORM).$(COMPILER).debug/libMOM6.a: build/shared.$(PLATFORM).$(COMPILER).debug/libfms.a
 
 	mkdir -p build/MOM6_asym.$(PLATFORM).$(COMPILER).debug
 	(cd build/MOM6_asym.$(PLATFORM).$(COMPILER).debug/; rm -f path_names; ../../src/mkmf/bin/list_paths \
@@ -73,7 +73,7 @@ build/MOM6_asym.$(PLATFORM).$(COMPILER).debug/libMOM6.a: compile_libs
 	"-Duse_libMPI -Duse_netCDF -DSPMD -DLAND_BND_TRACERS -Duse_AM3_physics" path_names; \
 	source ../../build/env/$(PLATFORM)-$(COMPILER); make  NETCDF=3 DEBUG=1 -j 8 libMOM6.a)
 
-build/MOM6_asym.$(PLATFORM).$(COMPILER).repro/libMOM6.a: compile_libs
+build/MOM6_asym.$(PLATFORM).$(COMPILER).repro/libMOM6.a: build/shared.$(PLATFORM).$(COMPILER).repro/libfms.a
 
 	mkdir -p build/MOM6_asym.$(PLATFORM).$(COMPILER).repro
 	(cd build/MOM6_asym.$(PLATFORM).$(COMPILER).repro/; rm -f path_names; ../../src/mkmf/bin/list_paths \
@@ -93,7 +93,7 @@ build/MOM6_asym.$(PLATFORM).$(COMPILER).repro/libMOM6.a: compile_libs
 
 compile_MOM6_solo: compile_libs build/MOM6_solo.$(PLATFORM).$(COMPILER).debug/MOM6 build/MOM6_solo.$(PLATFORM).$(COMPILER).repro/MOM6
 
-build/MOM6_solo.$(PLATFORM).$(COMPILER).debug/MOM6: compile_libs
+build/MOM6_solo.$(PLATFORM).$(COMPILER).debug/MOM6: build/shared.$(PLATFORM).$(COMPILER).debug/libfms.a
 
 	mkdir -p build/MOM6_solo.$(PLATFORM).$(COMPILER).debug
 	(cd build/MOM6_solo.$(PLATFORM).$(COMPILER).debug/; \
@@ -101,11 +101,11 @@ build/MOM6_solo.$(PLATFORM).$(COMPILER).debug/MOM6: compile_libs
         mv path_names path_names.orig; egrep -v 'coupler_types.F90' path_names.orig > path_names; \
 	../../src/mkmf/bin/mkmf -t ../../src/mkmf/templates/$(PLATFORM)-$(COMPILER).mk -o  '-I../../src/MOM6/src/framework \
         -I../../src/MOM6/config_src/dynamic_symmetric -I../MOM6.$(PLATFORM).$(COMPILER).debug -I../shared.$(PLATFORM).$(COMPILER).debug' \
-        -l '-L../MOM6.$(PLATFORM).$(COMPILER).debug -lMOM6 -L../shared.$(PLATFORM).$(COMPILER).debug -lfms' -p MOM6 \
+        -l '-L../MOM6.$(PLATFORM).$(COMPILER).debug -lMOM6 -L../shared.$(PLATFORM).$(COMPILER).debug -lfms -L$(CONDA_PREFIX)/lib -lmpich -lmpichf90 -lnetcdf -lnetcdff -lmpl  -lhdf5_hl -lhdf5 ' -p MOM6 \
         -c "-Duse_libMPI -Duse_netCDF -DSPMD -DLAND_BND_TRACERS -Duse_AM3_physics  " path_names; \
 	source ../../build/env/$(PLATFORM)-$(COMPILER); make  NETCDF=3 DEBUG=1 -j 8 MOM6)
 
-build/MOM6_solo.$(PLATFORM).$(COMPILER).repro/MOM6: compile_libs
+build/MOM6_solo.$(PLATFORM).$(COMPILER).repro/MOM6: build/shared.$(PLATFORM).$(COMPILER).repro/libfms.a
 
 	mkdir -p build/MOM6_solo.$(PLATFORM).$(COMPILER).repro
 	(cd build/MOM6_solo.$(PLATFORM).$(COMPILER).repro/; \
@@ -113,7 +113,7 @@ build/MOM6_solo.$(PLATFORM).$(COMPILER).repro/MOM6: compile_libs
         mv path_names path_names.orig; egrep -v 'coupler_types.F90' path_names.orig > path_names; \
 	../../src/mkmf/bin/mkmf -t ../../src/mkmf/templates/$(PLATFORM)-$(COMPILER).mk -o  '-I../../src/MOM6/src/framework \
         -I../../src/MOM6/config_src/dynamic_symmetric -I../MOM6.$(PLATFORM).$(COMPILER).repro -I../shared.$(PLATFORM).$(COMPILER).repro'\
-        -l '-L../MOM6.$(PLATFORM).$(COMPILER).repro -lMOM6 -L../shared.$(PLATFORM).$(COMPILER).repro -lfms -L$(CONDA_PREFIX)/lib -lmpich -lmpichf90 -lnetcdf -lnetcdff -lmpl -lmfhdf -ldf -lhdf5_hl -lhdf5 -ljpeg' -p MOM6 \
+        -l '-L../MOM6.$(PLATFORM).$(COMPILER).repro -lMOM6 -L../shared.$(PLATFORM).$(COMPILER).repro -lfms -L$(CONDA_PREFIX)/lib -lmpich -lmpichf90 -lnetcdf -lnetcdff -lmpl -lhdf5_hl -lhdf5 ' -p MOM6 \
         -c "-Duse_libMPI -Duse_netCDF -DSPMD -DLAND_BND_TRACERS -Duse_AM3_physics  " path_names; \
 	source ../../build/env/$(PLATFORM)-$(COMPILER); make  NETCDF=3 REPRO=1 -j 8 MOM6)
 
@@ -121,7 +121,7 @@ build/MOM6_solo.$(PLATFORM).$(COMPILER).repro/MOM6: compile_libs
 
 compile_MOM6_SIS2: compile_libs build/MOM6_SIS2.$(PLATFORM).$(COMPILER).debug/MOM6_SIS2 build/MOM6_SIS2.$(PLATFORM).$(COMPILER).repro/MOM6_SIS2
 
-build/MOM6_SIS2.$(PLATFORM).$(COMPILER).debug/MOM6_SIS2: compile_libs
+build/MOM6_SIS2.$(PLATFORM).$(COMPILER).debug/MOM6_SIS2: build/shared.$(PLATFORM).$(COMPILER).debug/libfms.a build/MOM6.$(PLATFORM).$(COMPILER).debug/libMOM6.a
 
 	mkdir -p build/MOM6_SIS2.$(PLATFORM).$(COMPILER).debug
 	(cd build/MOM6_SIS2.$(PLATFORM).$(COMPILER).debug/; \
@@ -132,7 +132,7 @@ build/MOM6_SIS2.$(PLATFORM).$(COMPILER).debug/MOM6_SIS2: compile_libs
         -c "-Duse_libMPI -Duse_netCDF -DSPMD -Duse_AM3_physics  " path_names; \
 	source ../../build/env/$(PLATFORM)-$(COMPILER); make  NETCDF=3 DEBUG=1 -j 8 MOM6_SIS2)
 
-build/MOM6_SIS2.$(PLATFORM).$(COMPILER).repro/MOM6_SIS2: compile_libs
+build/MOM6_SIS2.$(PLATFORM).$(COMPILER).repro/MOM6_SIS2: build/shared.$(PLATFORM).$(COMPILER).repro/libfms.a build/MOM6.$(PLATFORM).$(COMPILER).repro/libMOM6.a
 
 	mkdir -p build/MOM6_SIS2.$(PLATFORM).$(COMPILER).repro
 	(cd build/MOM6_SIS2.$(PLATFORM).$(COMPILER).repro/; \
@@ -146,7 +146,7 @@ build/MOM6_SIS2.$(PLATFORM).$(COMPILER).repro/MOM6_SIS2: compile_libs
 
 compile_MOM6_SIS2_LM3: compile_libs build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).debug/MOM6_SIS2_LM3 build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).repro/MOM6_SIS2_LM3
 
-build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).debug/MOM6_SIS2_LM3: compile_libs
+build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).debug/MOM6_SIS2_LM3: build/shared.$(PLATFORM).$(COMPILER).debug/libfms.a build/MOM6.$(PLATFORM).$(COMPILER).debug/libMOM6.a
 
 	mkdir -p build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).debug
 	(cd build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).debug/; \
@@ -159,7 +159,7 @@ build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).debug/MOM6_SIS2_LM3: compile_libs
         -p MOM6_SIS2_LM3 -c "-Duse_libMPI -Duse_netCDF -DSPMD  -Duse_AM3_physics  " path_names; \
 	source ../../build/env/$(PLATFORM)-$(COMPILER); make  NETCDF=3 DEBUG=1 -j 1 MOM6_SIS2_LM3)
 
-build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).repro/MOM6_SIS2_LM3: compile_libs
+build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).repro/MOM6_SIS2_LM3: build/shared.$(PLATFORM).$(COMPILER).repro/libfms.a build/MOM6.$(PLATFORM).$(COMPILER).repro/libMOM6.a
 
 	mkdir -p build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).repro
 	(cd build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).repro/; \
@@ -173,7 +173,11 @@ build/MOM6_SIS2_LM3.$(PLATFORM).$(COMPILER).repro/MOM6_SIS2_LM3: compile_libs
 	source ../../build/env/$(PLATFORM)-$(COMPILER); make  NETCDF=3 REPRO=1 -j 8 MOM6_SIS2_LM3)
 
 
-test_solo: compile_MOM6_solo
+test_solo: compile_MOM6_solo env
+
+	(cd ocean_only/double_gyre;if [ ! -d RESTART ] ; then mkdir RESTART; fi;$(RUN_CMD) -n 1 ../../build/MOM6_solo.$(PLATFORM).$(COMPILER).repro/MOM6 >&output; echo "double_gyre 1pe :" | tee  ../../$(RESULTS)/results;diff -s ocean.stats ocean.stats.$(COMPILER) | tee -a ../../$(RESULTS)/results)
+
+test_solo_all: compile_MOM6_solo
 
 	(cd ocean_only/double_gyre;$(RUN_CMD) -n 1 ../../build/MOM6_solo.$(PLATFORM).$(COMPILER).repro/MOM6 >&output; echo "double_gyre 1pe :" | tee  ../../$(RESULTS)/results;diff -s ocean.stats ocean.stats.$(COMPILER) | tee -a ../../$(RESULTS)/results)
 	(cd ocean_only/double_gyre;$(RUN_CMD) -n 2 ../../build/MOM6_solo.$(PLATFORM).$(COMPILER).repro/MOM6 >&output; echo "double_gyre 2pe :" | tee  ../../$(RESULTS)/results;diff -s ocean.stats ocean.stats.$(COMPILER) | tee -a ../../$(RESULTS)/results)
